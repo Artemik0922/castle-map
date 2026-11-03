@@ -1,0 +1,11 @@
+{
+  "name": "castle-map",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Карта локации для top-down игры на Three.js: крепость на скале, город за стеной, река с мостом, поля, карьер и лагерь осаждающих — всё генерируется из сида",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node tests/ballistics.test.mjs && node tests/invasion.test.mjs"
+  }
+}

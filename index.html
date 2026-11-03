@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Замок · Three.js top-down демо</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: rgba(14, 20, 26, 0.82);
+    --line: rgba(120, 200, 160, 0.18);
+    --text: #e8f1ec;
+    --muted: #96a8a0;
+    --accent: #46d39a;
+    --accent-dim: rgba(70, 211, 154, 0.16);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  canvas#scene { position: fixed; inset: 0; display: block; }
+
+  #panel {
+    position: fixed; top: 16px; left: 16px; width: 318px; max-height: calc(100vh - 32px);
+    overflow: auto; padding: 16px 16px 14px; border-radius: 14px;
+    background: var(--panel); border: 1px solid var(--line);
+    backdrop-filter: blur(12px) saturate(1.2);
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.45);
+    transition: transform 0.28s ease, opacity 0.28s ease;
+  }
+  #panel.hidden { transform: translateX(-112%); opacity: 0; }
+  #panel h1 { margin: 0 0 2px; font-size: 17px; letter-spacing: 0.2px; }
+  .sub { margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+  .group { margin-top: 14px; }
+  .label { display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 6px; }
+  .label b { color: var(--accent); font-weight: 600; font-size: 12px; letter-spacing: 0; }
+
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 7px 11px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.03);
+    color: var(--text); cursor: pointer; font-size: 12.5px; transition: background 0.16s, border-color 0.16s, transform 0.08s; }
+  .chip:hover { background: var(--accent-dim); border-color: rgba(70,211,154,0.45); }
+  .chip:active { transform: scale(0.97); }
+  .chip.active { background: var(--accent-dim); border-color: var(--accent); color: #d9ffe9; }
+
+  input[type="range"] { width: 100%; accent-color: var(--accent); height: 22px; }
+  .row { display: flex; gap: 7px; flex-wrap: wrap; }
+  button.action { flex: 1 1 auto; min-width: 92px; padding: 9px 10px; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--line); background: rgba(255,255,255,0.04); color: var(--text); font-size: 12.5px;
+    transition: background 0.16s, border-color 0.16s, transform 0.08s; }
+  button.action:hover { background: var(--accent-dim); border-color: rgba(70,211,154,0.5); }
+  button.action:active { transform: scale(0.97); }
+  button.primary { border-color: rgba(70,211,154,0.5); background: var(--accent-dim); color: #dcffec; font-weight: 600; }
+
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .toggle { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #cfe0d7; cursor: pointer; }
+  .toggle input { accent-color: var(--accent); width: 15px; height: 15px; }
+
+  .plaque { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.035);
+    border: 1px solid var(--line); font-size: 12px; color: #cfe0d7; }
+  .plaque b { color: var(--accent); }
+  .crest { display: flex; align-items: center; gap: 9px; margin-top: 10px; }
+  .crest .shield { width: 26px; height: 30px; border-radius: 4px 4px 12px 12px; border: 2px solid rgba(255,255,255,0.35); }
+  .crest .who { font-size: 13px; font-weight: 600; }
+  .crest .seed { color: var(--muted); font-size: 11px; }
+
+  .stats { margin-top: 12px; color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+  #chronoLog { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .logline { font-size: 11.5px; color: var(--text); padding: 5px 9px; border-radius: 8px;
+    background: rgba(70, 211, 154, 0.08); border-left: 2px solid rgba(70, 211, 154, 0.5); }
+  .logline:first-child { animation: appear 0.5s ease; }
+  @keyframes appear { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  .keys { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+  kbd { display: inline-block; padding: 1px 5px; margin: 0 1px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.05); color: #dbe9e2; font: 11px/1.5 ui-monospace, Consolas, monospace; }
+
+  #hint { position: fixed; right: 16px; bottom: 14px; color: rgba(232,241,236,0.55); font-size: 11.5px;
+    background: rgba(10,14,18,0.55); padding: 7px 11px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.07); }
+  #hint b { color: var(--accent); font-weight: 600; }
+
+  #loader { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at 50% 45%, #16222b, #0a0e12 70%);
+    transition: opacity 0.5s ease; z-index: 5; }
+  #loader.gone { opacity: 0; pointer-events: none; }
+  #loader .ring { width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(70,211,154,0.25);
+    border-top-color: var(--accent); animation: spin 0.9s linear infinite; }
+  #loader p { margin-top: 14px; color: var(--muted); font-size: 12.5px; letter-spacing: 0.4px; }
+  #loader .wrap { text-align: center; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(70,211,154,0.28); border-radius: 8px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="panel">
+  <h1>Замок на скале · карта локации</h1>
+  <p class="sub">Крепость, город за стеной, река с мостом и пристанью, поля, карьер и лагерь осаждающих · Three.js r169, без внешних ассетов</p>
+
+  <div class="group">
+    <div class="label">Летопись города <b id="chronoClock"></b></div>
+    <div class="stats" id="chronoStats">—</div>
+    <div class="label" style="margin-top:10px">Темп времени <b id="chronoSpeedVal">год в сутки</b></div>
+    <input id="chronoSpeed" type="range" min="0" max="5" step="1" value="1" />
+    <label class="toggle" style="margin-top:6px"><input id="chronoPause" type="checkbox" /> Пауза</label>
+    <div id="chronoLog"></div>
+  </div>
+
+  <div class="group">
+    <div class="label">Время суток</div>
+    <div class="chips" id="presets">
+      <button class="chip active" data-preset="morning">Утро</button>
+      <button class="chip" data-preset="noon">Полдень</button>
+      <button class="chip" data-preset="sunset">Закат</button>
+      <button class="chip" data-preset="night">Ночь</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Солнце <b id="sunVal"></b></div>
+    <input id="sun" type="range" min="0" max="360" step="1" value="118" />
+    <div class="label">Наклон камеры (90° = строго сверху) <b id="tiltVal"></b></div>
+    <input id="tilt" type="range" min="10" max="89" step="1" value="58" />
+    <div class="label">Высота камеры <b id="zoomVal"></b></div>
+    <input id="zoom" type="range" min="26" max="420" step="1" value="175" />
+  </div>
+
+  <div class="group">
+    <div class="label">Что показывать</div>
+    <div class="toggles">
+      <label class="toggle"><input id="shadows" type="checkbox" checked /> Тени</label>
+      <label class="toggle"><input id="units" type="checkbox" checked /> Гарнизон</label>
+      <label class="toggle"><input id="people" type="checkbox" checked /> Жители</label>
+      <label class="toggle"><input id="motion" type="checkbox" checked /> Огонь и дым</label>
+      <label class="toggle"><input id="orbit" type="checkbox" /> Облёт</label>
+      <label class="toggle"><input id="mapMode" type="checkbox" /> Режим карты</label>
+      <label class="toggle"><input id="wireframe" type="checkbox" /> Каркас</label>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Участки локации</div>
+    <div class="chips" id="views">
+      <button class="chip active" data-view="keep">Замок</button>
+      <button class="chip" data-view="town">Город</button>
+      <button class="chip" data-view="wharf">Пристань</button>
+      <button class="chip" data-view="fields">Поля</button>
+      <button class="chip" data-view="quarry">Карьер</button>
+      <button class="chip" data-view="camp">Лагерь</button>
+      <button class="chip" data-view="barracks">Казарма</button>
+      <button class="chip" data-view="range">Полигон</button>
+      <button class="chip" data-view="field">Поле боя</button>
+      <button class="chip" data-view="map">Вся карта</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Крепость</div>
+    <div class="row">
+      <button class="action primary" id="reseed">Новая локация</button>
+      <button class="action" id="bridge">Поднять мост</button>
+      <button class="action" id="gate">Поднять решётку</button>
+      <button class="action" id="reset">Камера</button>
+      <button class="action" id="shot">Скриншот</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Вторжение <b id="alarm">тишина · враг 0 · наши 0</b></div>
+    <div class="row">
+      <button class="action" id="invasion">Начать вторжение</button>
+      <button class="action" id="invasionStop">Отбой</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="label">Стрельбище</div>
+    <div class="row">
+      <button class="action primary" id="shotFire">Выстрел</button>
+      <button class="action" id="rangeReset">Восстановить мишени</button>
+    </div>
+    <div class="toggles" style="margin-top:8px">
+      <label class="toggle"><input id="rangeAuto" type="checkbox" /> Плановая стрельба</label>
+      <label class="toggle"><input id="follow" type="checkbox" /> Следить за снарядом</label>
+    </div>
+    <div class="stats" id="rangeStats" style="white-space:pre-line">—</div>
+  </div>
+
+  <div class="group">
+    <div class="label">Гарнизон</div>
+    <div class="row">
+      <button class="action" id="volley">Залп из мушкетов</button>
+      <button class="action" id="gunfire">Орудийный залп</button>
+    </div>
+  </div>
+
+  <div class="plaque" id="plaque">…</div>
+  <div class="plaque" id="locPlaque">…</div>
+  <div class="crest">
+    <span class="shield" id="crestA"></span>
+    <span class="who" id="faction">—</span>
+    <span class="seed">seed <b id="seed">—</b></span>
+  </div>
+  <div class="stats" id="stats">—</div>
+
+  <div class="keys">
+    ЛКМ — облёт · ПКМ/Shift — сдвиг · колесо — зум<br />
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> сдвиг · <kbd>Q</kbd><kbd>E</kbd> поворот · <kbd>R</kbd> камера<br />
+    <kbd>T</kbd> режим карты · <kbd>O</kbd> автооблёт · <kbd>B</kbd> мост · <kbd>G</kbd> решётка<br />
+    <kbd>V</kbd> залп взвода · <kbd>K</kbd> залп батареи · <kbd>F</kbd> выстрел с полигона · <kbd>I</kbd> вторжение · <kbd>N</kbd> новая локация · <kbd>1</kbd>–<kbd>4</kbd> время суток · <kbd>H</kbd> панель
+  </div>
+</div>
+
+<div id="hint">Собрано из <b>нулей и единиц</b>: текстуры, геометрия и гербы генерируются в рантайме</div>
+
+<div id="loader">
+  <div class="wrap">
+    <div class="ring"></div>
+    <p>Каменщик кладёт стены…</p>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
